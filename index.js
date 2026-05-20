@@ -38,7 +38,14 @@ const AskToGPTIntentHandler = {
   async handle(handlerInput) {
     const question = Alexa.getSlotValue(handlerInput.requestEnvelope, "question");
 
-    const result = await askToRotator(question);
+    let result;
+    try {
+      result = await askToRotator(question);
+    } catch (error) {
+      const fallbackMessage =
+        "Desculpe, não consegui processar sua pergunta neste momento. Por favor, tente novamente.";
+      return handlerInput.responseBuilder.speak(fallbackMessage).getResponse();
+    }
 
     const speakableText = getTTSSpeakable(result.text);
 
