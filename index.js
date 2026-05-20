@@ -1,28 +1,8 @@
 const Alexa = require("ask-sdk-core");
-const axios = require("axios");
+const rotator = require("./rotator");
 
 async function askToGPT(prompt) {
-  const response = await axios.post(
-    "https://api.openai.com/v1/chat/completions",
-    {
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: "You are a helpful assistant." },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 100,
-      temperature: 0.5,
-      top_p: 1,
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-    }
-  );
-
-  return response.data.choices[0].message.content;
+  return await rotator.makeInference(prompt);
 }
 
 function formatString(text) {
@@ -56,7 +36,14 @@ const HelloWorldIntentHandler = {
       "question"
     );
 
-    const responseFromGPT = await askToGPT(question);
+    let responseFromGPT;
+    try {
+      responseFromGPT = await askToGPT(question);
+    } catch (error) {
+      const fallbackMessage =
+        "Desculpe, não consegui processar sua pergunta neste momento. Por favor, tente novamente.";
+      return handlerInput.responseBuilder.speak(fallbackMessage).getResponse();
+    }
 
     const formattedResponse = formatString(responseFromGPT);
 
