@@ -306,9 +306,78 @@ function getAvailableProviders() {
   return API_PROVIDERS.filter((p) => process.env[p.envKey]);
 }
 
+const providerScores = {};
+const providerFailureCounts = {};
+
+function initProviderScores(providers) {
+  providers.forEach((p, index) => {
+    if (!providerScores[p.name]) {
+      providerScores[p.name] = 1;
+      providerFailureCounts[p.name] = 0;
+    }
+  });
+}
+
+async function pingProvider(provider) {
+  try {
+    await provider.makeRequest('test', { timeout: 3000, maxTokens: 10 });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getSortedProviders(providers) {
+  initProviderScores(providers);
+  return [...providers].sort((a, b) => {
+    const scoreA = providerScores[a.name] - providerFailureCounts[a.name];
+    const scoreB = providerScores[b.name] - providerFailureCounts[b.name];
+    return scoreB - scoreA;
+  });
+}
+
+async function makeInference(prompt, options = {}) {
+  const availableProviders = getAvailableProviders();
+  if (availableProviders.length === 0) {
+    throw new Error('No LLM API providers configured. Set at least one *_API_KEY environment variable.');
+  }
+  const sortedProviders = getSortedProviders(availableProviders);
+  const errors = [];
+
+  for (const provider of sortedProviders) {
+    try {
+      const response = await provider.makeRequest(prompt, options);
+      providerFailureCounts[provider.name] = 0;
+      providerScores[provider.name] = (providerScores[provider.name] || 1) + 1;
+      return { response, provider: provider.name };
+    } catch (error) {
+      providerFailureCounts[provider.name] = (providerFailureCounts[provider.name] || 0) + 1;
+      errors.push({ provider: provider.name, error: error.message });
+    }
+  }
+
+  const errorSummary = errors.map((e) => `${e.provider}: ${e.error}`).join('; ');
+  throw new Error(`All providers failed. Errors: ${errorSummary}`);
+}
+
+async function getProviderHealthStatus() {
+  const availableProviders = getAvailableProviders();
+  const results = [];
+
+  for (const provider of availableProviders) {
+    const isHealthy = await pingProvider(provider);
+    results.push({ name: provider.name, healthy: isHealthy, score: providerScores[provider.name] });
+  }
+
+  return results;
+}
+
 module.exports = {
   API_PROVIDERS,
   getProviderConfig,
   getAllProviderConfigs,
   getAvailableProviders,
+  makeInference,
+  getProviderHealthStatus,
+  pingProvider,
 };
