@@ -132,10 +132,9 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-### Node Patch ###
+
 # Serverless Webpack directories
 .webpack/
-
 
 
 # SvelteKit build / generate output
@@ -145,3 +144,5 @@ dist
 
 semantic-cache-data/
 # all rights reserved
+
+# A TESTER
